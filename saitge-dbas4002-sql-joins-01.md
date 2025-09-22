@@ -8,6 +8,7 @@ SELECT Patients.Name, Appointments.Date
 FROM Patients
 INNER JOIN Appointments ON Patients.ID = Appointments.PatientID;
 ```
+**Venn Representation:** `A ∩ B`  
 ![alt text](image-1.png)
 
 ### **LEFT JOIN**
@@ -18,6 +19,7 @@ SELECT Patients.Name, Appointments.Date
 FROM Patients
 LEFT JOIN Appointments ON Patients.ID = Appointments.PatientID;
 ```
+**Venn Representation:** `A ⟶ A ∪ B (with NULLs from B)`
 ![alt text](image-2.png)
 
 ### **RIGHT JOIN**
@@ -28,6 +30,7 @@ SELECT Patients.Name, Appointments.Date
 FROM Patients
 RIGHT JOIN Appointments ON Patients.ID = Appointments.PatientID;
 ```
+**Venn Representation:** `B ⟶ A ∪ B (with NULLs from A)`
 ![alt text](image-3.png)
 
 ### **FULL OUTER JOIN**
@@ -38,6 +41,7 @@ SELECT Patients.Name, Appointments.Date
 FROM Patients
 FULL OUTER JOIN Appointments ON Patients.ID = Appointments.PatientID;
 ```
+**Venn Representation:** `A ∪ B`
 ![alt text](image-4.png)
 ---
 

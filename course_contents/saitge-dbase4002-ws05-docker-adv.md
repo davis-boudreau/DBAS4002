@@ -1,5 +1,7 @@
 ![alt text](image.png)
 
+---
+
 ## 1) Assignment Details
 
 * **Course:** DBAS 3200 – Data-Driven Application Programming

@@ -1,0 +1,41 @@
+services:
+  db:
+    build: .
+    container_name: mp_db
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "${PGPORT}:5432"
+    volumes:
+      # Persistent database files
+      - pgdata:/var/lib/postgresql/data
+      # Mount all SQL (read-only) so you can run suites without rebuilding
+      - ./sql:/sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mp_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      # Optional but explicit: where to read the pre-registered servers file
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    ports:
+      - "${PGADMIN_PORT}:80"
+    depends_on:
+      - db
+    volumes:
+      # ✅ Mount ONLY the file, not the entire /pgadmin4 directory
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      # Optional: persist pgAdmin user/config DB between runs
+      - pgadmin-data:/var/lib/pgadmin
+
+volumes:
+  pgdata:
+  pgadmin-data:

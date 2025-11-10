@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16
+    container_name: tx_db
+    env_file: .env
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: tx_pgadmin
+    env_file: .env
+    ports:
+      - "${PGADMIN_PORT}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  pgadmin_data:

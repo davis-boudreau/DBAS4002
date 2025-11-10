@@ -1,0 +1,12 @@
+.env
+*.env
+pgdata/
+pgadmin/
+__pycache__/
+*.log
+*.pid
+.vscode/
+.idea/
+.DS_Store
+tmp/
+*.tmp

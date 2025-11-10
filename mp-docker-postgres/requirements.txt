@@ -1,0 +1,18 @@
+# While PostgreSQL and pgAdmin are packaged via Docker images, a requirements.txt file is 
+# still useful for development tools, testing utilities, and documentation consistency, 
+# especially when this project evolves (for example, when you connect it to a Django or Python-based API later).
+
+# --- Core Database Tools ---
+psycopg2-binary==2.9.9       # PostgreSQL driver (for Python scripts)
+SQLAlchemy==2.0.25           # ORM / query testing helper
+alembic==1.13.2              # Schema migration framework (future use)
+
+# --- Developer Utilities ---
+pgcli==4.1.0                 # Better interactive Postgres CLI
+sqlfluff==3.0.6              # SQL linter for query formatting
+pytest==8.3.3                # Unit testing framework
+pytest-dotenv==0.5.2         # Load .env for tests
+
+# --- Documentation / Formatting ---
+black==24.10.0               # Code formatter
+flake8==7.1.1                # Python linter

@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "txlab",
+      "Group": "DBAS4002",
+      "Port": 5432,
+      "Username": "txadmin",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "postgres"
+    }
+  }
+}

@@ -189,7 +189,7 @@ You can verify it exists using:
 CREATE OR REPLACE FUNCTION prevent_duplicate_registration() RETURNS TRIGGER AS $$
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM Registration 
+    SELECT 1 FROM registration 
     WHERE event_id = NEW.event_id AND participant_id = NEW.participant_id
   ) THEN
     RAISE NOTICE 'Duplicate registration ignored.';
@@ -200,7 +200,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER before_registration_insert
-BEFORE INSERT ON Registration
+BEFORE INSERT ON registration
 FOR EACH ROW EXECUTE FUNCTION prevent_duplicate_registration();
 ```
 
@@ -208,7 +208,7 @@ FOR EACH ROW EXECUTE FUNCTION prevent_duplicate_registration();
 
 ```sql
 CREATE TRIGGER after_registration_audit
-AFTER INSERT OR UPDATE OR DELETE ON Registration
+AFTER INSERT OR UPDATE OR DELETE ON registration
 FOR EACH ROW EXECUTE FUNCTION log_registration_changes();
 ```
 
@@ -230,16 +230,16 @@ Check your triggers:
 ```sql
 BEGIN;
 
-INSERT INTO Registration (event_id, participant_id, payment_status)
+INSERT INTO registration (event_id, participant_id, payment_status)
 VALUES (1, 3, 'Paid');
 
 -- Duplicate test (ignored)
-INSERT INTO Registration (event_id, participant_id, payment_status)
+INSERT INTO registration (event_id, participant_id, payment_status)
 VALUES (1, 3, 'Paid');
 
-UPDATE Registration SET payment_status = 'Cancelled' WHERE registration_id = 1;
+UPDATE registration SET payment_status = 'Cancelled' WHERE registration_id = 1;
 
-DELETE FROM Registration WHERE registration_id = 2;
+DELETE FROM registration WHERE registration_id = 2;
 
 COMMIT;
 
@@ -255,7 +255,7 @@ Each successful operation should appear in `registration_audit`. The duplicate i
 
 ```sql
 BEGIN;
-INSERT INTO Registration (event_id, participant_id, payment_status)
+INSERT INTO registration (event_id, participant_id, payment_status)
 VALUES (1, 1, 'Paid');
 ROLLBACK;
 

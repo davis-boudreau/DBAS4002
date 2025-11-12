@@ -13,26 +13,30 @@
 | **Instructor**     | Davis Boudreau                                           |
 | **Stack Used**     | DBAS PostgreSQL DevOps Stack (v3.2)                      |
 | **Duration**       | 3 hours                                                  |
-| **Version**        | 1.0 (Fall 2025)                                          |
+| **Version**        | 2.0 (Fall 2025)                                          |
 
 ---
 
 ## **2. Overview / Purpose / Objectives**
 
-Modern databases rely on **query optimizers** to decide how data is accessed and joined efficiently.
-In this workshop, you’ll learn how to **analyze query execution plans**, understand **indexing strategies**, and measure the impact of performance tuning directly within your Dockerized PostgreSQL environment.
+### **Context**
+
+As transactional databases grow, query performance becomes a defining factor for scalability and user experience. In a production setting, even a single poorly optimized query can slow down an entire system.
+This workshop moves beyond basic SQL logic to explore *how PostgreSQL executes queries*, *how the optimizer makes decisions*, and *how to fine-tune indexes* to achieve predictable, performant behaviour.
 
 ### **Purpose**
 
-This lab introduces practical skills in **query optimization**, showing how small schema or indexing decisions can drastically improve performance and reduce system load.
+You will use PostgreSQL’s built-in diagnostic tools — `EXPLAIN`, `EXPLAIN ANALYZE`, and `pg_stat_activity` — to **analyze query execution plans**, understand **how indexes influence access paths**, and apply **real-world tuning techniques** inside your Dockerized PostgreSQL stack.
 
 ### **Objectives**
 
-* Use the `EXPLAIN` and `EXPLAIN ANALYZE` commands to interpret query execution plans.
-* Differentiate between **clustered**, **non-clustered**, and **covering indexes**.
-* Compare query performance before and after index creation.
-* Interpret key plan operations (Seq Scan, Index Scan, Index Only Scan, Hash Join, Nested Loop).
-* Reflect on indexing trade-offs between read vs write performance.
+By the end of this lab, you will:
+
+1. Use `EXPLAIN` and `EXPLAIN ANALYZE` to interpret query execution plans.
+2. Understand sequential scans, index scans, and join strategies.
+3. Create clustered, non-clustered, and covering indexes for performance improvement.
+4. Compare execution times and planner decisions before and after optimization.
+5. Reflect on indexing trade-offs and long-term tuning strategies.
 
 ---
 
@@ -40,62 +44,101 @@ This lab introduces practical skills in **query optimization**, showing how smal
 
 **Outcome 3 – Optimize distribution of transactional load in standalone/client-server/N-tier systems**
 
-> Analyze and tune SQL queries using indexing, query plans, and batching techniques to improve performance and scalability.
+> Apply query optimization, indexing, and plan analysis to distribute workload efficiently and improve system performance.
 
 ---
 
 ## **4. Workshop Context / Use Case**
 
-You’re continuing with the **Event Management System** database in the **DBAS PostgreSQL DevOps Stack (v3.2)**.
-Your schema now contains several interrelated tables such as `Event`, `Category`, `Registration`, and `Participant`.
-Management has noticed that **reporting queries** are running slowly — particularly those filtering by event date or aggregating registration counts.
+Continuing from your **Event Management System**, the database now supports hundreds of events and registrations. Reports and dashboards that summarize participation data are becoming slower — particularly those that aggregate by category or date.
 
-Your task is to:
+The operations team has asked you, as a database developer, to:
 
-1. Investigate slow queries using **EXPLAIN plans**.
-2. Add appropriate indexes to improve performance.
-3. Document and compare results before and after tuning.
+* Identify *why* these queries are slow.
+* Create indexes that can reduce query time without hurting insert/update performance.
+* Compare “before” and “after” performance using measurable metrics.
 
----
-
-## **5. Tools Overview**
-
-| Tool                          | Purpose                                                        |
-| ----------------------------- | -------------------------------------------------------------- |
-| **Docker Compose / Makefile** | Run and manage PostgreSQL containers.                          |
-| **psql Shell**                | Execute SQL queries and view execution plans.                  |
-| **pgAdmin**                   | Visualize query performance metrics.                           |
-| **EXPLAIN / EXPLAIN ANALYZE** | Examine PostgreSQL query optimizer decisions.                  |
-| **Indexes**                   | Data structures that speed up read access to specific columns. |
+You’ll perform all optimization directly in your **DBAS PostgreSQL DevOps Stack (v3.2)** environment, ensuring consistent results across student machines and production-like conditions.
 
 ---
 
-## **6. Step-by-Step Instructions**
+## **5. Background: Query Optimization in PostgreSQL**
+
+PostgreSQL uses a **cost-based optimizer**, which estimates the “cost” of different execution strategies and automatically selects the cheapest plan.
+
+The optimizer’s decisions depend on:
+
+* **Statistics** about table size and data distribution (from `ANALYZE`).
+* **Available indexes** and whether they cover the needed columns.
+* **Query filters, joins, and aggregations.**
+
+When you run:
+
+```sql
+EXPLAIN ANALYZE SELECT ...;
+```
+
+PostgreSQL actually executes the query, showing:
+
+* The chosen access path (Seq Scan, Index Scan, Nested Loop, etc.).
+* Estimated vs. actual row counts.
+* Execution time per step.
+
+This visibility allows you to fine-tune performance *empirically*, instead of guessing.
 
 ---
 
-### 🧭 Step 1 – Launch Your Stack
+## **6. Tools Overview**
 
-**Tool:** Makefile + Docker Compose
+| Tool                  | Description                                  | Usage in Workshop                             |
+| --------------------- | -------------------------------------------- | --------------------------------------------- |
+| **Docker Compose**    | Orchestrates PostgreSQL + pgAdmin containers | Starts the environment (`make up`)            |
+| **Makefile**          | Automates common database commands           | `make psql`, `make run-queries`, `make reset` |
+| **psql Shell**        | Command-line SQL client                      | Execute EXPLAIN and CREATE INDEX              |
+| **pgAdmin**           | Graphical management and visualization       | Inspect plans visually                        |
+| **EXPLAIN / ANALYZE** | PostgreSQL’s query plan visualization tools  | Measure and interpret optimizer behaviour     |
+
+---
+
+## **7. Step-by-Step Workshop Instructions**
+
+---
+
+### 🧭 Step 1 – Launch and Connect
+
+**Tool:** Docker + Makefile
+Start your stack and connect to PostgreSQL via the CLI.
 
 ```bash
 make up
 make psql
 ```
 
-This opens the `psql` shell inside the PostgreSQL container (`mp_db`), connected to your `event_db`.
-Verify your data:
+Confirm you’re in the correct database:
 
 ```sql
-\dt
-SELECT COUNT(*) FROM registration;
+\conninfo
 ```
+
+It should show:
+
+```
+You are connected to database "event_db" as user "app_user" on host "localhost"
+```
+
+Enable query timing:
+
+```sql
+\timing on
+```
+
+This will display actual query durations in milliseconds — an essential metric for performance tuning.
 
 ---
 
-### 📊 Step 2 – Identify a Slow Query
+### 🧩 Step 2 – Identify a Slow Query
 
-We’ll begin with a query that counts how many participants are registered for each event.
+Let’s begin with a reporting-style query that counts the number of registrations per event.
 
 ```sql
 EXPLAIN ANALYZE
@@ -106,39 +149,58 @@ GROUP BY e.name
 ORDER BY total_registrations DESC;
 ```
 
-### **Observe the Output:**
+**Observe the plan output:**
 
-Look for:
+* Do you see `Seq Scan` (Sequential Scan)?
+* Are there costly `Hash Join` or `Sort` steps?
+* Note the “actual time” and “rows removed by filter”.
 
-* `Seq Scan` – a sequential scan over the whole table
-* `HashAggregate` – grouping data using in-memory hashing
-* `Sort` – final ordering step
-
-If you see **Seq Scan** across large tables, that’s a potential candidate for indexing.
+This baseline will help you measure improvement later.
 
 ---
 
-### ⚙️ Step 3 – Add Basic Indexes
+### ⚙️ Step 3 – Analyze the Execution Plan
 
-**Tool:** PostgreSQL DDL for index creation
-Let’s optimize the most common filtering and join columns.
+**Understanding Key Plan Terms:**
+
+| Keyword                                  | Meaning                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| **Seq Scan**                             | Table scanned row-by-row; slow for large data.                     |
+| **Index Scan**                           | Uses an index to jump directly to matching rows.                   |
+| **Index Only Scan**                      | Uses index without reading the table (if all columns are covered). |
+| **Nested Loop / Hash Join / Merge Join** | Types of join algorithms; optimizer picks based on cost.           |
+| **Cost Estimate**                        | Planner’s predicted cost before execution.                         |
+| **Actual Time**                          | Real time measured during execution (from `ANALYZE`).              |
+
+**Goal:** Learn to “read” the plan — it’s the database’s reasoning process.
+
+---
+
+### 🧱 Step 4 – Create Indexes for Key Access Paths
+
+Indexes help PostgreSQL locate data faster but come with a trade-off: they speed up **reads** while slightly slowing **writes** (INSERT/UPDATE/DELETE).
+
+We’ll create several types of indexes.
 
 ```sql
--- Index for event lookups
+-- Basic B-tree indexes (default)
+CREATE INDEX idx_event_dates ON event (start_date, end_date);
 CREATE INDEX idx_registration_eventid ON registration (event_id);
-
--- Index for participant lookups
 CREATE INDEX idx_registration_participantid ON registration (participant_id);
 
--- Index for date-based searches
-CREATE INDEX idx_event_dates ON event (start_date, end_date);
+-- Covering index: all columns used by a common query
+CREATE INDEX idx_reg_cover ON registration (event_id, participant_id, payment_status);
 ```
 
-Each index improves lookups by creating a **B-tree** structure for faster access.
+**Key Concepts:**
+
+* **Clustered Index:** Physically orders table rows on disk by index key.
+* **Non-clustered Index:** Stores separate index structure referencing table rows.
+* **Covering Index:** Contains all columns needed for a query, avoiding table reads.
 
 ---
 
-### 🔍 Step 4 – Compare Query Plans (Before & After)
+### 🔍 Step 5 – Compare Query Plans Before & After
 
 Re-run the same query:
 
@@ -151,80 +213,68 @@ GROUP BY e.name
 ORDER BY total_registrations DESC;
 ```
 
-Look for:
+Now look for:
 
-* `Index Scan` or `Index Only Scan` replacing `Seq Scan`.
-* Lower **actual time** (milliseconds).
-* Reduced **rows removed by filter** or **loops**.
+* **Index Scan** or **Index Only Scan** (instead of `Seq Scan`)
+* Lower **execution cost** and **actual time**
+* Fewer rows processed or removed
 
-💡 Use `\timing on` in `psql` to measure query execution time directly.
-
----
-
-### 🧠 Step 5 – Explore Index Types
-
-| Index Type              | Description                                                                          | PostgreSQL Support                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| **Clustered Index**     | Physically orders table data based on index key (PostgreSQL supports via `CLUSTER`). | ✅ `CLUSTER event USING idx_event_dates;`                                                   |
-| **Non-clustered Index** | Logical structure pointing to row locations (default `CREATE INDEX`).                | ✅ Default behavior                                                                         |
-| **Covering Index**      | Includes all columns needed by query, avoiding extra lookups.                        | ✅ `CREATE INDEX idx_reg_cover ON registration (event_id, participant_id, payment_status);` |
-
-Test how each index affects plan efficiency.
+💡 *You can also run `ANALYZE;` before re-testing to refresh table statistics.*
 
 ---
 
-### 🧪 Step 6 – Analyze a Filtered Query
+### 🧮 Step 6 – Measure Filtered Queries
 
-Try running a selective query with and without indexes:
+Let’s test performance with filtering — a realistic case from an admin dashboard.
 
 ```sql
 EXPLAIN ANALYZE
-SELECT * FROM registration
+SELECT *
+FROM registration
 WHERE event_id = 2
 AND payment_status = 'Paid';
 ```
 
-Notice the difference in **cost estimate** and **execution time**.
-The optimizer uses the **index statistics** to decide when scanning the entire table is cheaper than using an index.
+Notice how the optimizer switches between **Index Scan** and **Seq Scan** based on selectivity (the percentage of matching rows).
+If too many rows match, the optimizer might *choose* a full table scan.
 
 ---
 
-### 📈 Step 7 – Visualize in pgAdmin
+### 📈 Step 7 – Visualize with pgAdmin
 
-**Tool:** pgAdmin Query Tool → Execution Plan tab
+**Tool:** pgAdmin → Query Tool → Execution Plan Tab
 
-1. Open pgAdmin at `http://localhost:5050`
-2. Connect to the server (`servers.json` auto-configured)
-3. Paste the query into Query Tool → Run → click “Execution Plan” tab
+1. Go to [http://localhost:5050](http://localhost:5050)
+2. Connect using your stored `servers.json` profile.
+3. Open the Query Tool, paste your EXPLAIN ANALYZE query.
+4. Switch to the *Execution Plan* tab to view the graphical layout — nodes, costs, joins, and I/O operations.
 
-This shows the graphical flow: scans, joins, and estimated row counts.
+This visualization helps link textual plans to data flow diagrams, a skill you’ll reuse in database administration roles.
 
 ---
 
-### 🔄 Step 8 – Clean Up & Document
+### 🧾 Step 8 – Cleanup, Comment, and Reflect
 
-If you’re finished testing, you can safely drop indexes:
+Once finished, clean up unused indexes:
 
 ```sql
 DROP INDEX idx_registration_eventid;
 DROP INDEX idx_registration_participantid;
 DROP INDEX idx_event_dates;
+DROP INDEX idx_reg_cover;
 ```
 
-Add comments in your SQL file:
+Add inline SQL comments summarizing your findings:
 
 ```sql
--- Index added to improve join between Event and Registration
--- Index improved performance by reducing Seq Scan time from 65ms → 12ms
+-- Query before index: Seq Scan  ~65ms
+-- Query after index: Index Scan ~12ms
+-- Improvement: 80% reduction in execution time
 ```
-
-Then reflect:
-
-> Which index improved performance the most, and why?
 
 ---
 
-## **7. Deliverables**
+## **8. Deliverables**
 
 Submit:
 
@@ -232,55 +282,56 @@ Submit:
 Lastname_Firstname_WS09_Query_Tuning.sql
 ```
 
-including:
+Include:
 
-* Original and tuned queries
-* EXPLAIN ANALYZE outputs (copied as comments)
-* Index creation and removal statements
-* Reflection notes at the bottom
-
----
-
-## **8. Reflection Questions**
-
-1. How does PostgreSQL decide when to use an index?
-2. What’s the difference between a sequential scan and an index scan?
-3. When can an index **hurt** performance?
-4. How do clustered and covering indexes differ?
-5. What is the trade-off between read speed and write cost?
+* All queries tested
+* EXPLAIN and EXPLAIN ANALYZE outputs as comments
+* Index creation and removal commands
+* Summary notes and reflections
 
 ---
 
-## **9. Assessment & Rubric**
+## **9. Reflection Questions**
 
-| Criteria                   | Excellent (3)                      | Satisfactory (2)   | Needs Improvement (1)  | Pts     |
-| -------------------------- | ---------------------------------- | ------------------ | ---------------------- | ------- |
-| Query Analysis             | Correctly interprets EXPLAIN plans | Minor errors       | Incomplete             | __/3    |
-| Indexing Strategy          | Appropriate and tested             | Generic or partial | Missing or ineffective | __/3    |
-| Performance Testing        | Measured before/after comparison   | Limited testing    | Not compared           | __/2    |
-| Documentation & Reflection | Clear and analytical               | Somewhat general   | Minimal                | __/2    |
-| **Total**                  |                                    |                    |                        | **/10** |
+1. Why might PostgreSQL still choose a sequential scan even when an index exists?
+2. How do statistics influence the query planner’s decisions?
+3. What trade-offs exist between adding many indexes and maintaining write performance?
+4. What scenarios benefit most from clustered or covering indexes?
+5. How can indexing decisions evolve as data volume grows?
 
 ---
 
-## **10. Submission Guidelines**
+## **10. Assessment & Rubric (10 pts)**
 
-* Complete all work inside **DBAS PostgreSQL DevOps Stack (v3.2)**.
-* Use `make psql` to access the containerized shell.
-* Include both pre- and post-optimization EXPLAIN results as comments.
+| Criteria                   | Excellent (3)                    | Satisfactory (2)      | Needs Improvement (1) | Pts     |
+| -------------------------- | -------------------------------- | --------------------- | --------------------- | ------- |
+| Query Plan Interpretation  | Accurately reads EXPLAIN outputs | Partial understanding | Minimal explanation   | __/3    |
+| Indexing Strategy          | Effective and justified          | Generic               | Misapplied            | __/3    |
+| Performance Measurement    | Valid before/after comparison    | Limited evidence      | Missing data          | __/2    |
+| Reflection & Documentation | Detailed and applied             | General               | Minimal               | __/2    |
+| **Total**                  |                                  |                       |                       | **/10** |
+
+---
+
+## **11. Submission Guidelines**
+
+* Work must be completed in the **DBAS PostgreSQL DevOps Stack (v3.2)**.
+* Use the `psql` shell for queries and `pgAdmin` for visualization.
+* Include `EXPLAIN ANALYZE` outputs directly in your submission as SQL comments.
 * Submit via Brightspace or GitHub.
 
 ---
 
-## **11. Resources / Equipment**
+## **12. Resources / Equipment**
 
-* Docker Desktop / Compose
 * DBAS PostgreSQL DevOps Stack (v3.2)
-* PostgreSQL Documentation → [https://www.postgresql.org/docs/current/using-explain.html](https://www.postgresql.org/docs/current/using-explain.html)
-* pgAdmin Query Tool Execution Plan tab
+* PostgreSQL Docs → [Using EXPLAIN](https://www.postgresql.org/docs/current/using-explain.html)
+* Docker Desktop / Compose
+* pgAdmin Query Tool
 
 ---
 
-## **12. Copyright**
+## **13. Copyright**
 
-© 2025 Nova Scotia Community College – For educational use only.
+© 2025 Nova Scotia Community College — For educational use only.
+

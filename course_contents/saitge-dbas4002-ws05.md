@@ -5,7 +5,9 @@
 ## **1. Workshop Overview**
 
 **Focus:** Understanding and applying **aggregate** and **window (analytic)** functions to extract insights from relational data.
+
 **Duration:** 3 hours (guided + independent lab)
+
 **Related Outcomes:**
 
 * Apply SQL functions to analyze and summarize data.

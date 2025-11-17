@@ -4,4 +4,8 @@ Option,0,"UPDATE",
 Option,100,"CREATE TABLE",
 Option,0,"INSERT",
 Option,0,"ALTER TABLE",
-Feedback,"Question: Which SQL command defines a new table’s structure?<\br>Correct Answer: CREATE TABLE<\br>Background: SQL (Structured Query Language) includes a family of commands known as Data Definition Language (DDL) used to create or modify the structure of database objects. The key DDL commands are CREATE, ALTER, and DROP."
+Feedback,"Question: Which SQL command defines a new table’s structure?
+
+Correct Answer: CREATE TABLE
+
+Background: SQL (Structured Query Language) includes a family of commands known as Data Definition Language (DDL) used to create or modify the structure of database objects. The key DDL commands are CREATE, ALTER, and DROP."

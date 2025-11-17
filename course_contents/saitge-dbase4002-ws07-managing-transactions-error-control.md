@@ -4,267 +4,324 @@
 
 ## **1. Assignment Details**
 
-* **Course Code:** DBAS 4002
-* **Course Name:** Transactional Database Programming
-* **Workshop Title:** Workshop 07 – Managing Transactions & Error Control
-* **Assignment Type:** Guided Workshop / Hands-On Lab
-* **Duration:** 1 - 2 hours
-* **Version:** 1.0 (Fall 2025)
-* **Instructor:** Davis Boudreau
+| Field              | Information                                        |
+| ------------------ | -------------------------------------------------- |
+| **Course Code**    | DBAS 4002                                          |
+| **Course Name**    | Transactional Database Programming                 |
+| **Workshop Title** | Workshop 07 – Transaction Control & Error Handling |
+| **Type**           | Guided Workshop (Applied Lab + Reflection)         |
+| **Instructor**     | Davis Boudreau                                     |
+| **Stack Used**     | DBAS PostgreSQL DevOps Stack (v3.2)                |
+| **Duration**       | 3 hours                                            |
+| **Version**        | 2.0 (Fall 2025)                                    |
 
 ---
 
 ## **2. Overview / Purpose / Objectives**
 
-**Purpose:**
-This workshop teaches you how to safeguard data integrity by managing **ACID transactions**, handling **runtime errors**, and designing **safe rollback logic** in your Dockerized PostgreSQL environment.
-You will implement multi-statement operations that behave as one atomic transaction and analyze how errors trigger rollbacks.
+### **Conceptual Framing**
 
-**Objectives:**
+Transactional systems form the **core of enterprise data integrity**. Every financial transfer, booking, or registration depends on reliable, atomic operations that *either complete fully or roll back entirely*.
+This workshop moves students from writing SQL statements to managing **multi-statement logic within transaction boundaries**, exploring how **PostgreSQL ensures ACID compliance** through commit control, savepoints, and exception handling.
 
-1. Explain and demonstrate ACID principles in a transactional context.
-2. Implement explicit transactions (`BEGIN … COMMIT … ROLLBACK`).
-3. Use `SAVEPOINT` and `EXCEPTION` to isolate and recover from partial failures.
-4. Test rollback behaviour with intentional errors in seeded data.
-5. Reflect on the importance of atomicity and error control in production systems.
+Students will work entirely inside their **Dockerized PostgreSQL environment**, gaining a realistic understanding of how developers protect data from partial failure and maintain business consistency.
 
 ---
 
-## **3. Learning Outcomes Addressed**
+### **Purpose**
 
-* **O1:** Code SQL logic that maintains consistency under transactional control.
-* **O2:** Implement procedural SQL with error handling and safe rollback mechanisms.
-* **O3:** Use Docker to reproduce transactional tests in a controlled environment.
+Students will learn to:
 
----
-
-## **4. Assignment Description / Use Case**
-
-Continuing with the **Event Management System** from the Docker mini-project, you will now:
-
-* Perform a multi-step transaction that registers participants for events.
-* Add a payment record only if the registration succeeds.
-* Handle failures (e.g., duplicate registration or invalid event ID) gracefully using rollbacks.
+* Manage transactions using `BEGIN`, `COMMIT`, and `ROLLBACK`.
+* Use `SAVEPOINT` and `ROLLBACK TO` for nested control.
+* Handle errors gracefully with `EXCEPTION` blocks in PL/pgSQL.
+* Simulate concurrent or failed operations to observe recovery.
+* Apply best practices for **idempotent, rollback-safe procedures**.
 
 ---
 
-## **5. Tasks / Instructions**
+### **Learning Outcomes Addressed**
 
-### 🧭 Step 1 – Start Your Docker Environment
+**Outcome 2 – Manage transactions with DML + procedural code**
+
+> Apply transactional concepts, ACID control, and error handling to safeguard data integrity.
+
+---
+
+## **3. Workshop Context**
+
+Your Event Management System is now handling hundreds of registrations. Occasionally, two users attempt to register the same participant for the same event simultaneously, or a network issue interrupts a payment update.
+This lab simulates such scenarios to help you understand **how PostgreSQL prevents corruption** through its **transaction manager**.
+
+Real-world equivalents include:
+
+* Online registration systems ensuring seats are not oversold.
+* Financial transfers preventing double withdrawals.
+* Order systems maintaining consistent stock levels during checkout.
+
+---
+
+## **4. Background Concepts**
+
+| Concept              | Explanation                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| **Transaction**      | A logical unit of work that must be executed fully or not at all.                       |
+| **ACID**             | Atomicity, Consistency, Isolation, Durability — the foundation of database reliability. |
+| **Isolation Levels** | Control how visible uncommitted data is to other sessions.                              |
+| **Error Handling**   | Catching and managing run-time exceptions using `EXCEPTION` blocks.                     |
+| **Idempotency**      | Guaranteeing that re-running a transaction produces no adverse side-effects.            |
+
+---
+
+## **5. Tools Overview**
+
+| Tool                          | Role                                                           |
+| ----------------------------- | -------------------------------------------------------------- |
+| **Docker Compose + Makefile** | Starts the PostgreSQL + pgAdmin environment (`make up`).       |
+| **psql Shell**                | Executes transactional SQL and procedural blocks.              |
+| **pgAdmin**                   | Used to visualize tables and logs post-execution.              |
+| **/sql directory**            | Stores re-usable scripts for running and testing transactions. |
+
+---
+
+## **6. Step-by-Step Workshop Instructions**
+
+---
+
+### 🧭 Step 1 – Start Environment and Connect
 
 ```bash
 make up
 make psql
 ```
 
-Verify your schema and seed data are present:
+Confirm connection:
 
 ```sql
-\dt
-SELECT * FROM Event;
-SELECT * FROM Participant;
+\conninfo
+```
+
+Turn on timing:
+
+```sql
+\timing on
+```
+
+You’ll execute every step inside an **active `psql` session** within the container.
+
+---
+
+### ⚙️ Step 2 – Create a Safe Test Table
+
+We’ll isolate this exercise from production data:
+
+```sql
+CREATE TABLE IF NOT EXISTS transaction_demo (
+  demo_id SERIAL PRIMARY KEY,
+  step_name TEXT,
+  note TEXT
+);
+```
+
+Confirm creation:
+
+```sql
+\dt transaction_demo
 ```
 
 ---
 
-### ⚙️ Step 2 – Create a Transactional Procedure
+### 🧱 Step 3 – Basic Transaction Control
 
-In `sql/50_transactions/workshop7_registration_txn.sql`, create a procedure that registers a participant for an event.
+A transaction groups several operations into an **atomic** unit:
 
 ```sql
-CREATE OR REPLACE PROCEDURE register_participant_txn(
-    p_event_id INT,
-    p_participant_id INT,
-    p_payment_status VARCHAR DEFAULT 'Pending'
-)
-LANGUAGE plpgsql
-AS $$
+BEGIN;
+
+INSERT INTO transaction_demo (step_name, note)
+VALUES ('Step 1', 'Start operation');
+
+INSERT INTO transaction_demo (step_name, note)
+VALUES ('Step 2', 'Intermediate step');
+
+-- simulate an issue:
+-- SELECT 1/0;
+
+COMMIT;
+```
+
+💡 If you uncomment the divide-by-zero line, PostgreSQL will automatically roll back the entire transaction — proving **atomicity**.
+
+---
+
+### 🧩 Step 4 – Using SAVEPOINTS
+
+`SAVEPOINT` allows recovery to an intermediate stage:
+
+```sql
+BEGIN;
+
+INSERT INTO transaction_demo (step_name, note)
+VALUES ('Outer', 'Before savepoint');
+
+SAVEPOINT midway;
+
+INSERT INTO transaction_demo (step_name, note)
+VALUES ('Inner', 'Inside savepoint');
+
+-- oops! simulate a failed insert:
+INSERT INTO transaction_demo (demo_id, step_name, note)
+VALUES (1, 'Duplicate PK', 'Forcing error');
+
+ROLLBACK TO midway;  -- undo only the failed insert
+COMMIT;
+```
+
+✅ Only rows before the savepoint remain — showing *partial rollback control*.
+
+---
+
+### 🔄 Step 5 – Error Handling with EXCEPTION Blocks
+
+**Conceptual Context:**
+Procedural blocks in PostgreSQL can catch runtime exceptions. This enables logging, retry logic, or graceful degradation.
+
+```sql
+DO $$
 BEGIN
-    -- Start explicit transaction
-    BEGIN
-        -- Validate event exists
-        IF NOT EXISTS (SELECT 1 FROM Event WHERE event_id = p_event_id) THEN
-            RAISE EXCEPTION 'Event ID % does not exist', p_event_id;
-        END IF;
+  BEGIN
+    INSERT INTO transaction_demo (step_name, note)
+    VALUES ('Risky Insert', 'May violate constraint');
 
-        -- Validate participant exists
-        IF NOT EXISTS (SELECT 1 FROM Participant WHERE participant_id = p_participant_id) THEN
-            RAISE EXCEPTION 'Participant ID % does not exist', p_participant_id;
-        END IF;
-
-        -- Attempt registration
-        INSERT INTO Registration (event_id, participant_id, payment_status)
-        VALUES (p_event_id, p_participant_id, p_payment_status);
-
-        RAISE NOTICE 'Participant % successfully registered for event %',
-                     p_participant_id, p_event_id;
-
-        COMMIT;
-    EXCEPTION
-        WHEN unique_violation THEN
-            ROLLBACK;
-            RAISE NOTICE 'Registration already exists for participant % on event %', p_participant_id, p_event_id;
-        WHEN others THEN
-            ROLLBACK;
-            RAISE NOTICE 'Transaction failed: %', SQLERRM;
-    END;
-END;
-$$;
+  EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'Duplicate key detected – operation skipped safely.';
+  END;
+END $$;
 ```
 
-Run:
+This demonstrates **idempotency**: the same command can re-run without harm.
+
+---
+
+### 🧠 Step 6 – Testing Atomicity in the Event System
+
+Simulate a real registration transaction:
 
 ```sql
-CALL register_participant_txn(2, 1, 'Paid');
+BEGIN;
+
+-- deduct seat count (hypothetical column)
+UPDATE event
+SET priority = priority - 1
+WHERE event_id = 1;
+
+-- add registration
+INSERT INTO registration (event_id, participant_id, payment_status)
+VALUES (1, 10, 'Paid');
+
+-- simulate failure
+INSERT INTO registration (event_id, participant_id, payment_status)
+VALUES (1, 10, 'Paid');  -- duplicate
+
+COMMIT;
 ```
 
-and then query:
+💡 You’ll see an error and an implicit rollback — no seat count decremented, no partial insert.
+
+---
+
+### 🔍 Step 7 – Validate Consistency and Isolation
+
+In `psql` (Session 1):
 
 ```sql
-SELECT * FROM Registration WHERE event_id = 2;
+BEGIN;
+UPDATE event SET priority = 5 WHERE event_id = 2;
+-- leave transaction open
 ```
 
----
-
-### 🧩 Step 3 – Simulate a Failure
-
-Try a duplicate insert:
+In a **second session** (`make psql` again):
 
 ```sql
-CALL register_participant_txn(2, 1, 'Paid');
+SELECT priority FROM event WHERE event_id = 2;
 ```
 
-Expected output:
-`NOTICE: Registration already exists…`
-Confirm that no duplicate row appears.
+You’ll observe that changes are invisible until the first session **commits** — illustrating **isolation**.
 
 ---
 
-### 💾 Step 4 – Nested Transactions with SAVEPOINTS
+### 🧾 Step 8 – Reflect and Document
 
-Enhance the procedure to include a SAVEPOINT for partial recovery:
+After tests:
 
 ```sql
-BEGIN
-    SAVEPOINT before_payment;
-
-    INSERT INTO Registration (event_id, participant_id, payment_status)
-    VALUES (p_event_id, p_participant_id, 'Pending');
-
-    -- Simulate failure in payment
-    IF p_payment_status NOT IN ('Pending','Paid','Cancelled') THEN
-        RAISE EXCEPTION 'Invalid payment status: %', p_payment_status;
-    END IF;
-
-    UPDATE Registration SET payment_status = p_payment_status
-    WHERE event_id = p_event_id AND participant_id = p_participant_id;
-
-    COMMIT;
-EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK TO before_payment;
-        RAISE NOTICE 'Payment failed, registration retained as Pending.';
-        COMMIT;
-END;
+SELECT * FROM transaction_demo;
 ```
 
-Test:
+Then clean up:
 
 ```sql
-CALL register_participant_txn(3, 2, 'InvalidStatus');
+TRUNCATE TABLE transaction_demo RESTART IDENTITY;
 ```
 
-Then:
-
-```sql
-SELECT * FROM Registration WHERE event_id = 3;
-```
-
-Result: Registration exists with `Pending` status — the savepoint worked.
-
 ---
 
-### 🧮 Step 5 – Error Analysis
+## **7. Deliverables**
 
-Query the transaction log:
-
-```sql
-SELECT NOW() AS check_time, COUNT(*) FROM Registration;
-```
-
-Observe that successful transactions increased row count; failed ones did not.
-
----
-
-### 🧠 Step 6 – Reflection Activity
-
-Discuss in pairs or reflect in your journal:
-
-> Why is it dangerous to mix application-level logic with uncontrolled multi-table SQL statements?
-> How do transactions and error handling improve data trust and consistency?
-
----
-
-## **6. Deliverables**
-
-Submit a zip named:
+Submit:
 
 ```
-studentid_dbas4002_workshop7_transactions.zip
+Lastname_Firstname_WS07_Transactions.sql
 ```
 
-Including:
+Include:
 
-* `sql/50_transactions/workshop7_registration_txn.sql`
-* `workshop7_reflection.docx`
-
----
-
-## **7. Reflection Questions**
-
-1. Describe each ACID property and how PostgreSQL ensures it.
-2. Why might a SAVEPOINT be preferable to a full ROLLBACK?
-3. What risks exist if error handling is omitted from procedures?
-4. How does Dockerization improve the consistency of transaction testing across machines?
-5. Provide a real-world example where rollback prevents data corruption.
+* All code examples and tests
+* Inline comments explaining outcomes
+* One paragraph reflection
 
 ---
 
-## **8. Assessment & Rubric (10 pts)**
+## **8. Reflection Questions**
 
-| **Criteria**                | **Excellent (3)**                          | **Satisfactory (2)**   | **Needs Improvement (1)** | **Pts** |
-| --------------------------- | ------------------------------------------ | ---------------------- | ------------------------- | ------- |
-| Transactional Integrity     | Fully atomic, tested for success & failure | Works with minor flaws | Incomplete or non-atomic  | __/3    |
-| Error Handling & Savepoints | Robust EXCEPTION logic + SAVEPOINT use     | Basic error handling   | No rollback logic         | __/3    |
-| Code Clarity & Comments     | Clear structure + comments                 | Some comments          | None                      | __/2    |
-| Reflection Depth            | Analytical and practical                   | General                | Missing                   | __/2    |
-| **Total**                   |                                            |                        |                           | **/10** |
+1. Why is atomicity essential in transactional systems?
+2. How do savepoints differ from full rollbacks?
+3. In what real-world scenario could idempotent logic prevent data loss?
+4. Why is isolation a necessary property for concurrent systems?
+5. How can EXCEPTION handling improve reliability in stored procedures?
 
 ---
 
-## **9. Submission Guidelines**
+## **9. Assessment & Rubric (10 pts)**
 
-* Test your procedure in Docker before submission (`make run-tests`).
-* Add header comments for each procedure with your name and purpose.
-* Submit via Brightspace or GitHub repository.
-
----
-
-## **10. Resources / Equipment**
-
-* Dockerized PostgreSQL stack (from MP-Docker).
-* `make` commands for build & testing.
-* Reference: [PostgreSQL Transactions Documentation](https://www.postgresql.org/docs/current/tutorial-transactions.html)
+| Criteria                   | Excellent (3)                    | Satisfactory (2)      | Needs Improvement (1)      | Pts     |
+| -------------------------- | -------------------------------- | --------------------- | -------------------------- | ------- |
+| Transactional Logic        | Correct, atomic, well-structured | Minor errors          | Incomplete or inconsistent | __/3    |
+| Savepoint & Rollback Usage | Demonstrated & explained         | Partial understanding | Missing                    | __/3    |
+| Error Handling             | Uses EXCEPTION correctly         | Partial logic         | Missing or invalid         | __/2    |
+| Reflection                 | Insightful, connects to ACID     | Generic               | Missing                    | __/2    |
+| **Total**                  |                                  |                       |                            | **/10** |
 
 ---
 
-## **11. Academic Policies**
+## **10. Submission Guidelines**
 
-Follow NSCC academic integrity guidelines. All SQL must be authored by you; cite any adapted examples in comments.
+* Use `make psql` inside **DBAS PostgreSQL DevOps Stack (v3.2)**.
+* Comment every test’s result directly in SQL.
+* Submit `.sql` and `.txt` reflection on Brightspace or GitHub.
 
 ---
 
-## **12. Copyright Notice**
+## **11. Resources / Equipment**
 
-© 2025 Nova Scotia Community College – Transactional Database Programming (DBAS 4002). For educational use only.
+* DBAS PostgreSQL DevOps Stack (v3.2)
+* PostgreSQL Docs: [Transactions](https://www.postgresql.org/docs/current/tutorial-transactions.html)
+* Docker Desktop / Compose
+* pgAdmin Query Tool
+
+---
+
+## **12. Copyright**
+
+© 2025 Nova Scotia Community College — For educational use only.
 

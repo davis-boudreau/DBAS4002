@@ -50,7 +50,7 @@ VALUES
 ('David', 'Stevens', 'david.stevens@example.com', '902-555-3357'),
 ('Elena', 'Kirk', 'elena.kirk@example.com', '902-555-4466'),
 ('Frank', 'Peters', 'frank.peters@example.com', '902-555-5544'),
-('Grace', 'O\'Brien', 'grace.obrien@example.com', '902-555-6767'),
+('Grace', 'O\Brien', 'grace.obrien@example.com', '902-555-6767'),
 ('Henry', 'White', 'henry.white@example.com', '902-555-7878'),
 ('Isabella', 'Chen', 'isabella.chen@example.com', '902-555-8080'),
 ('Jake', 'Thompson', 'jake.thompson@example.com', '902-555-9191');

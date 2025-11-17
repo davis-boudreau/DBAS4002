@@ -1,118 +1,277 @@
-# 🏗️ Week 1 Workshop: Designing the Database – From ER Model to Schema
-
-### 🎯 Learning Objectives
-
-By the end of this workshop, you will be able to:
-
-* Translate real-world requirements into an ER (Entity–Relationship) model.
-* Convert the ER model into a relational schema with primary and foreign keys.
-* Apply normalization principles (up to 3NF) to reduce redundancy.
-* Document the schema in a way that supports later SQL development.
+![alt text](image.png)
 
 ---
 
-## 1. Introduction (10 min)
 
-Before writing any SQL, we must design the database structure. Think of this as **blueprints before building a house**. A good design enforces data integrity and makes future queries easier and faster.
+## **1. Assignment Details**
 
-We will use a **case study** throughout this course (e.g., managing categories and events), but the process applies to **any business domain**.
-
----
-
-## 2. Activity A – Requirements to Entities (15 min)
-
-**Step 1. Read the Requirements**
-Suppose the system needs to:
-
-* Organize **categories** (e.g., “Workshops”, “Conferences”).
-* Store details of **events** (name, start/end date, description, location, organizer, priority).
-* Track relationships (every event belongs to one category).
-
-**Step 2. Identify Entities & Attributes**
-
-* **Category** → name
-* **Event** → name, start\_date, end\_date, description, location, organizer, priority
-
-**Exercise A1:**
-Write down at least **two more attributes** you think would be useful for either entity (e.g., “cost”, “capacity”).
-
-**Reflection Prompt:**
-Why did you choose these attributes? How do they help the system’s usefulness?
+| Field              | Information                                           |
+| :----------------- | :---------------------------------------------------- |
+| **Course Code**    | DBAS 4002                                             |
+| **Course Name**    | Transactional Database Programming                    |
+| **Workshop Title** | Workshop 01 – Relational Foundations & Database Setup |
+| **Type**           | Guided Workshop (Activity + Reflection)               |
+| **Instructor**     | Davis Boudreau                                        |
+| **Stack Used**     | DBAS PostgreSQL DevOps Stack (v3.2)                   |
+| **Duration**       | 3 hours                                               |
 
 ---
 
-## 3. Activity B – ER Diagram (20 min)
+## **2. Overview / Purpose / Objectives**
 
-**Step 1. Draw the Entities**
+### **Conceptual Framing**
 
-* Use two rectangles: **Category** and **Event**.
+Transactional systems depend on a **solid relational foundation**. Before writing a single transaction or stored procedure, you must understand how **tables, relationships, and constraints** ensure data consistency across concurrent operations.
 
-**Step 2. Add Relationships**
+This workshop builds that foundation through:
 
-* An event *belongs to* one category.
-* A category *has many* events.
+* an introduction to **relational design principles**,
+* deployment of a **Dockerized PostgreSQL environment**, and
+* creation of your **base schema** that future workshops will expand (joins, transactions, triggers, and optimization).
 
-**Step 3. Add Cardinalities**
-
-* Category : Event → **1 : Many**
-
-**Exercise B1:**
-Sketch this ER diagram on paper or a digital tool (e.g., dbdiagram.io, Lucidchart, or draw\.io).
-
-**Exercise B2:**
-Add the attributes from Activity A, marking primary keys (e.g., `category_id`, `event_id`).
+By the end of this activity, you’ll understand **why relational design matters**, and **how Docker ensures reproducibility** in professional database workflows.
 
 ---
 
-## 4. Activity C – Schema Design (25 min)
+### **Purpose**
 
-**Step 1. Convert to Tables**
-Write the relational schema:
+You will:
+
+* Deploy a PostgreSQL + pgAdmin environment using Docker Compose.
+* Verify that PostgreSQL services, volumes, and credentials function correctly.
+* Create the foundational database schema (Category → Event case study).
+* Populate seed data and perform initial verification queries.
+* Reflect on data integrity and reproducibility.
+
+---
+
+### **Learning Outcomes Addressed**
+
+**Outcome 1 – Code SQL to meet requirements with business logic**
+
+> Design and build relational schemas with correct data types, keys, and integrity constraints.
+
+---
+
+## **3. Workshop Context**
+
+The **Category–Event** schema simulates a small transactional system, representing how real applications categorize, schedule, and manage business entities.
+Each event belongs to a category (a one-to-many relationship). This mirrors how systems manage dependencies (e.g., product categories → products, departments → employees, etc.).
+
+The schema also forms the baseline for future workshops:
+
+* **Week 2:** Filtering and Retrieval
+* **Week 3:** Joins and Subqueries
+* **Week 4:** Integrity and Business Rules
+* **Week 5:** Aggregations and Windows
+
+---
+
+## **4. Background Concepts**
+
+| Concept                | Description                                                                            |
+| :--------------------- | :------------------------------------------------------------------------------------- |
+| **Relational Model**   | Organizes data into tables (relations) of rows and columns with defined relationships. |
+| **Primary Key**        | Ensures each row is unique.                                                            |
+| **Foreign Key**        | Maintains referential integrity across tables.                                         |
+| **Normalization**      | Reduces redundancy and improves consistency (1NF → 3NF).                               |
+| **Schema**             | Logical blueprint of tables, relationships, and constraints.                           |
+| **Docker Environment** | Provides consistent runtime environments for PostgreSQL and pgAdmin across platforms.  |
+
+---
+
+## **5. Tools Overview**
+
+| Tool               | Role                                                                |
+| :----------------- | :------------------------------------------------------------------ |
+| **Docker Compose** | Orchestrates PostgreSQL and pgAdmin containers.                     |
+| **Makefile**       | Simplifies commands for `up`, `down`, and `psql` operations.        |
+| **psql Shell**     | Executes SQL directly in the PostgreSQL container.                  |
+| **pgAdmin**        | Visual interface for browsing tables and querying data.             |
+| **.env File**      | Centralizes environment variables (e.g., DB user, password, ports). |
+
+---
+
+## **6. Step-by-Step Workshop Instructions**
+
+---
+
+### 🧭 Step 1 – Initialize the Environment
+
+1. Open your terminal in the project folder.
+
+2. Run:
+
+   ```bash
+   make up
+   ```
+
+   This command launches both **PostgreSQL** and **pgAdmin** containers using the Docker Compose configuration.
+
+3. Verify:
+
+   ```bash
+   docker ps
+   ```
+
+   You should see containers named `mp_db` and `mp_pgadmin`.
+
+💡 **Concept:** Docker encapsulates dependencies, versions, and configurations, preventing “works on my machine” inconsistencies.
+
+---
+
+### ⚙️ Step 2 – Connect via psql Shell
+
+1. Open the interactive psql shell:
+
+   ```bash
+   make psql
+   ```
+2. Verify connection:
+
+   ```sql
+   \conninfo
+   ```
+
+   You’ll see the current database name, user, and port.
+
+💡 **Concept:** Using `psql` inside Docker ensures you’re operating inside the running container, independent of local installations.
+
+---
+
+### 🧱 Step 3 – Create the Base Schema
+
+Inside psql:
+
+```sql
+CREATE TABLE category (
+  category_id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE event (
+  event_id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  category_id INT REFERENCES category(category_id),
+  start_date TIMESTAMP NOT NULL,
+  end_date TIMESTAMP NOT NULL,
+  priority INT DEFAULT 1,
+  description TEXT,
+  location VARCHAR(255),
+  organizer VARCHAR(100)
+);
+```
+
+💡 **Concept:**
+
+* `SERIAL` automatically increments IDs.
+* `REFERENCES` enforces referential integrity.
+* `DEFAULT` provides base values when none are given.
+
+---
+
+### 🧩 Step 4 – Insert Seed Data
+
+Execute:
+
+```sql
+INSERT INTO category (name) VALUES
+('Workshop'), ('Seminar'), ('Conference');
+
+INSERT INTO event (name, category_id, start_date, end_date, priority, description, location, organizer)
+VALUES
+('Database Kickoff', 1, '2025-09-10 09:00', '2025-09-10 12:00', 1, 'Intro to SQL and relational design', 'Room 203', 'D. Boudreau'),
+('Docker Deep Dive', 2, '2025-09-12 13:00', '2025-09-12 15:00', 2, 'Exploring PostgreSQL DevOps Stack', 'Lab 2', 'A. Student');
+```
+
+💡 **Concept:** The seed script simulates business data; this schema will grow into a fully transactional system in later weeks.
+
+---
+
+### 🔍 Step 5 – Verify and Explore Data
+
+```sql
+SELECT * FROM category;
+SELECT name, start_date FROM event ORDER BY start_date;
+```
+
+In pgAdmin: refresh the schema and browse tables to confirm the data.
+
+💡 **Concept:** A quick visual check in pgAdmin helps validate your database state and relationships before writing queries or transactions.
+
+---
+
+### 💾 Step 6 – Snapshot Your Work
+
+Run:
+
+```bash
+docker compose exec mp_db pg_dump -U postgres -d dbas4002 > backup/schema_snapshot.sql
+```
+
+This creates a reusable baseline for future workshops.
+
+💡 **Concept:** Frequent backups ensure data recoverability — an essential habit for transactional developers.
+
+---
+
+## **7. Deliverables**
+
+Submit:
 
 ```
-Category(
-    category_id INT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
-)
-
-Event(
-    event_id INT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    start_date DATETIME NOT NULL,
-    end_date DATETIME NOT NULL,
-    priority INT DEFAULT 1,
-    description TEXT,
-    location VARCHAR(255),
-    organizer VARCHAR(100),
-    category_id INT,
-    FOREIGN KEY (category_id) REFERENCES Category(category_id)
-)
+Lastname_Firstname_WS01_Setup.sql
 ```
 
-**Step 2. Discuss Keys**
+Include:
 
-* Every table should have a **primary key**.
-* Use **foreign keys** to link related tables.
-
-**Exercise C1:**
-Normalize the schema: Check for repeating groups, partial dependencies, and transitive dependencies. Does your design already meet **3NF**?
-
-**Exercise C2:**
-Suggest one **business rule** you might enforce with a constraint (e.g., “end\_date must be after start\_date”).
+* Schema creation commands
+* Seed data inserts
+* Verification queries
+* Short reflection answers
 
 ---
 
-## 5. Wrap-Up & Reflection (10 min)
+## **8. Reflection Questions**
 
-**Deliverable:**
+1. Why is referential integrity crucial for transactional systems?
+2. How does Docker help create a consistent learning environment?
+3. What potential issues arise when normalization is ignored?
+4. What benefits do seed scripts provide in a team development setting?
+5. How does a well-structured schema support error handling in future transactions?
 
-* Submit your ER diagram and relational schema.
-* Include a short (150–200 words) reflection:
+---
 
-  * What design choices did you make?
-  * How did normalization affect your schema?
-  * What constraints did you add and why?
+## **9. Assessment & Rubric (10 pts)**
 
-**Looking Ahead:**
-In Week 2, we’ll begin **querying the database** with `SELECT`, `WHERE`, and `ORDER BY`. Your schema will be the foundation for these queries.
+| Criteria          | Excellent (3)                                | Satisfactory (2)                   | Needs Improvement (1)           | Pts     |
+| :---------------- | :------------------------------------------- | :--------------------------------- | :------------------------------ | :------ |
+| Environment Setup | Containers run successfully and verified     | Minor connection issues            | Not functional                  | __/3    |
+| Schema Design     | Correct tables, types, and keys              | Minor errors in types or relations | Incomplete schema               | __/3    |
+| Seed & Queries    | Proper seed data and valid SELECTs           | Partial data or syntax issues      | Missing data or invalid queries | __/2    |
+| Reflection        | Deep insight connecting concepts to practice | Superficial understanding          | Missing or unclear              | __/2    |
+| **Total**         |                                              |                                    |                                 | **/10** |
+
+---
+
+## **10. Submission Guidelines**
+
+* Use `make up` to start the stack and `make psql` to access PostgreSQL.
+* Execute commands inside the psql session.
+* Export and upload your SQL file to Brightspace or GitHub.
+
+---
+
+## **11. Resources / Equipment**
+
+* **DBAS PostgreSQL DevOps Stack (v3.2)**
+* Docker Desktop + Docker Compose
+* PostgreSQL Documentation (DDL & Constraints)
+* pgAdmin or psql CLI
+
+---
+
+## **12. Copyright**
+
+© 2025 Nova Scotia Community College — For educational use only.
 

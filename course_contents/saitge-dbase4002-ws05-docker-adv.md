@@ -4,7 +4,7 @@
 
 ## 1) Assignment Details
 
-* **Course:** DBAS 3200 – Data-Driven Application Programming
+* **Course:** DBAS 4002 – Data-Driven Application Programming
 * **Title:** MP-Docker – PostgreSQL in Containers + Database Bootstrap
 * **Type:** Guided Tutorial + Build Scripts (Hands-On)
 * **Estimated Time:** 3–6 hours (first setup) + 1–2 hours reruns

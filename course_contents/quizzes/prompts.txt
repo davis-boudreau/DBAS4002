@@ -1,0 +1,20 @@
+generate a 10 question quiz in a code block from the topic:
+Optimization (Weeks 9–11): Plans → Indexes → Scaling 
+Mark the correct answer with an * in front of the answer. 
+Randomize the position of the answer within the list of possible answers.
+
+generate feedback explanations for 
+Optimization (Weeks 9–11): Plans → Indexes → Scaling , 
+with reasoning and conceptual reinforcement.  
+Use code samples when appropriate.
+
+generate a 10 question quiz in a code block from the topic:
+Integration (Weeks 12–14): Distribution → Refactor → Showcase
+Mark the correct answer with an * in front of the answer. 
+Randomize the position of the answer within the list of possible answers.
+
+generate feedback explanations for 
+Integration (Weeks 12–14): Distribution → Refactor → Showcase
+with reasoning and conceptual reinforcement.  
+Use code samples when appropriate.
+
